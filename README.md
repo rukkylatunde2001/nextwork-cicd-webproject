@@ -34,12 +34,12 @@ Every push to the `master` branch triggers the full Source → Build → Deploy 
 
 This project is built across 6 parts of the [NextWork DevOps Series](https://nextwork.org):
 
-- **Part 1 — [Set Up a Web App in the Cloud](https://learn.nextwork.org/projects/aws-devops-vscode):** Launch an EC2 instance, connect with VS Code via Remote SSH, install Java and Maven, and create a Java web application
-- **Part 2 — [Connect a GitHub Repo with AWS](https://learn.nextwork.org/projects/aws-devops-github):** Install Git, push the project to GitHub, and set up version control for the pipeline
-- **Part 3 — [Store Dependencies in CodeArtifact](https://learn.nextwork.org/projects/aws-devops-codeartifact-updated):** Set up a private Maven repository in CodeArtifact to securely manage Java dependencies instead of pulling from the public internet
-- **Part 4 — [Package an App with CodeBuild](https://learn.nextwork.org/projects/aws-devops-codebuild-updated):** Write a `buildspec.yml` to automate compiling and packaging the app into a `.war` file
-- **Part 5 — [Deploy an App with CodeDeploy](https://learn.nextwork.org/projects/aws-devops-codedeploy-updated):** Write `appspec.yml` and deployment scripts to automate installing the app on the EC2 server using Tomcat
-- **Part 6 — [CI/CD with CodePipeline](https://learn.nextwork.org/projects/aws-devops-codepipeline-updated):** Connect all stages into one automated pipeline triggered by every GitHub push
+- **Part 1 — [Set Up a Web App in the Cloud]** Launch an EC2 instance, connect with VS Code via Remote SSH, install Java and Maven, and create a Java web application
+- **Part 2 — [Connect a GitHub Repo with AWS]** Install Git, push the project to GitHub, and set up version control for the pipeline
+- **Part 3 — [Store Dependencies in CodeArtifact]** Set up a Maven repository in CodeArtifact to securely manage Java dependencies instead of pulling from the public internet
+- **Part 4 — [Package an App with CodeBuild]** Write a `buildspec.yml` to automate compiling and packaging the app into a `.war` file
+- **Part 5 — [Deploy an App with CodeDeploy]** Write `appspec.yml` and deployment scripts to automate installing the app on the EC2 server using Tomcat
+- **Part 6 — [CI/CD with CodePipeline]** Connect all stages into one automated pipeline triggered by every GitHub push
 
 ---
 
@@ -105,7 +105,7 @@ Updated `index.jsp`, pushed to GitHub, and watched the pipeline automatically tr
 Real issues encountered and resolved during the project:
 
 **Wrong AWS region in settings.xml**
-The CodeArtifact URL pointed to `eu-north-1` (Stockholm) while all resources were in `us-east-1`. This caused `Unauthorized` errors during the Maven build. Fixed by updating the URL to the correct region — a reminder to always check the region selector in the AWS Console before creating resources.
+The CodeArtifact URL pointed to `eu-north-1` (Stockholm) while all resources were in `us-east-1`. This caused `Unauthorised` errors during the Maven build. Fixed by updating the URL to the correct region — a reminder to always check the region selector in the AWS Console before creating resources.
 
 **CodeBuild missing CodeArtifact permissions**
 Each time the CodeBuild project was recreated, its new service role had no CodeArtifact permissions, causing the pre_build phase to fail with exit status 254. Fixed by attaching `AWSCodeArtifactReadOnlyAccess` to the CodeBuild service role.
@@ -124,13 +124,8 @@ AWS assigns a new public IP every time an instance restarts, breaking SSH config
 ## About the Author
 
 **Rukayat Alarape**
-AWS DevOps learner | NextWork Student
-
-Built as part of the [NextWork 6-Part DevOps Series](https://nextwork.org).
+Cloud Engineer learner 
 
 - GitHub: [@rukkylatunde2001](https://github.com/rukkylatunde2001)
 - Email: rukkylatunde2001@gmail.com
 
----
-
-*Part of the NextWork DevOps Series: Set Up a Web App → Connect GitHub → Store Dependencies → Package App → Deploy App → **CI/CD with CodePipeline** ✅*

@@ -10,62 +10,36 @@ A fully automated CI/CD pipeline built on AWS that detects code changes on GitHu
 
 ## Live Demo
 
-![Live App Screenshot](screenshots/live-app.png)
-
-The app is deployed to an EC2 instance and served via Apache Tomcat on port 8080. Every push to the `master` branch triggers the full pipeline automatically.
+![Live App](screenshots/live-app.png)
 
 ---
 
-## Pipeline Overview
+## Architecture
+
+![Architecture Diagram](screenshots/architecture.png)
+
+An IAM user creates the development environment — including `settings.xml`, `buildspec.yml`, `appspec.yml`, deployment scripts, and `index.jsp` — secured with a key pair and instance profile. Code is pushed from the development environment to GitHub, which triggers CodePipeline via CodeConnection. CodeBuild fetches dependencies from CodeArtifact, compiles the app, and stores the artifact in an S3 bucket. CodeDeploy then picks up the artifact and deploys it to the Web Server inside a VPC, provisioned by CloudFormation — making the app live on the internet.
+
+---
+
+## Pipeline Success
 
 ![CodePipeline All Stages Green](screenshots/pipeline-success.png)
 
-```
-Push code to GitHub
-        ↓
-CodePipeline detects change (webhook)
-        ↓
-CodeBuild fetches packages from CodeArtifact
-    → Compiles Java source code
-    → Packages into .war file
-    → Saves artifact to S3
-        ↓
-CodeDeploy picks up artifact from S3
-    → Stops Tomcat on EC2
-    → Copies new .war to Tomcat webapps/
-    → Starts Tomcat
-    → Validates app is running
-        ↓
-Updated app is LIVE ✅
-```
+Every push to the `master` branch triggers the full Source → Build → Deploy pipeline automatically.
 
 ---
 
-## Table of Contents
+## What This Project Demonstrates
 
-- [Project Overview](#project-overview)
-- [AWS Services Used](#aws-services-used)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Key Configuration Files](#key-configuration-files)
-- [Troubleshooting & Lessons Learned](#troubleshooting--lessons-learned)
-- [About the Author](#about-the-author)
+This project is built across 6 parts of the [NextWork DevOps Series](https://nextwork.org):
 
----
-
-## Project Overview
-
-This project is **Part 6 of the NextWork DevOps Series** — a hands-on challenge to build a production-style CI/CD pipeline from scratch on AWS.
-
-**What this project demonstrates:**
-- Launching and configuring EC2 infrastructure using CloudFormation (Infrastructure as Code)
-- Connecting a GitHub repository to AWS as the source of truth for deployments
-- Setting up a private Maven package repository with AWS CodeArtifact for secure dependency management
-- Automating the build process with AWS CodeBuild using a custom `buildspec.yml`
-- Automating deployments with AWS CodeDeploy using lifecycle hooks and deployment scripts
-- Tying everything together with AWS CodePipeline for a fully automated end-to-end workflow
-
-**The result:** Change one line of code, push to GitHub, and the update is live on the server in under 5 minutes — automatically.
+- **Part 1 — [Set Up a Web App in the Cloud](https://learn.nextwork.org/projects/aws-devops-vscode):** Launch an EC2 instance, connect with VS Code via Remote SSH, install Java and Maven, and create a Java web application
+- **Part 2 — [Connect a GitHub Repo with AWS](https://learn.nextwork.org/projects/aws-devops-github):** Install Git, push the project to GitHub, and set up version control for the pipeline
+- **Part 3 — [Store Dependencies in CodeArtifact](https://learn.nextwork.org/projects/aws-devops-codeartifact-updated):** Set up a private Maven repository in CodeArtifact to securely manage Java dependencies instead of pulling from the public internet
+- **Part 4 — [Package an App with CodeBuild](https://learn.nextwork.org/projects/aws-devops-codebuild-updated):** Write a `buildspec.yml` to automate compiling and packaging the app into a `.war` file
+- **Part 5 — [Deploy an App with CodeDeploy](https://learn.nextwork.org/projects/aws-devops-codedeploy-updated):** Write `appspec.yml` and deployment scripts to automate installing the app on the EC2 server using Tomcat
+- **Part 6 — [CI/CD with CodePipeline](https://learn.nextwork.org/projects/aws-devops-codepipeline-updated):** Connect all stages into one automated pipeline triggered by every GitHub push
 
 ---
 
@@ -73,113 +47,77 @@ This project is **Part 6 of the NextWork DevOps Series** — a hands-on challeng
 
 | Service | Purpose |
 |---|---|
-| **Amazon EC2** | Virtual server hosting the Java web application via Apache Tomcat |
-| **AWS CloudFormation** | Infrastructure as Code — provisions EC2, VPC, security groups, and IAM roles in one template |
-| **AWS CodeArtifact** | Private Maven repository for securely managing Java dependencies |
+| **Amazon EC2** | Virtual server hosting the Java web app via Apache Tomcat |
+| **AWS CloudFormation** | Provisions EC2, VPC, security groups, and IAM roles as Infrastructure as Code |
+| **AWS CodeArtifact** | Private Maven repository for secure dependency management |
 | **AWS CodeBuild** | Builds and packages the Java app into a `.war` file |
-| **AWS CodeDeploy** | Deploys the built artifact to the EC2 instance automatically |
+| **AWS CodeDeploy** | Deploys the built artifact to EC2 automatically |
 | **AWS CodePipeline** | Orchestrates the full Source → Build → Deploy workflow |
 | **Amazon S3** | Stores build artifacts between pipeline stages |
 | **AWS IAM** | Manages permissions between all services |
 | **GitHub** | Source control — pipeline triggers on every push to `master` |
+| **VS Code** | IDE used to develop directly on the EC2 instance via Remote SSH |
 
 ---
 
-## Architecture
+## How It Was Built — Step by Step
 
-```
-┌─────────────┐     webhook      ┌──────────────────────────────────────────┐
-│   GitHub    │ ──────────────► │              AWS CodePipeline             │
-│  (master)   │                  │                                          │
-└─────────────┘                  │  ┌──────────┐  ┌──────────┐  ┌────────┐ │
-                                  │  │  Source  │─►│  Build   │─►│ Deploy │ │
-                                  │  └──────────┘  └──────────┘  └────────┘ │
-                                  └──────────────────────────────────────────┘
-                                           │              │            │
-                                      GitHub App    CodeBuild    CodeDeploy
-                                                         │            │
-                                                  CodeArtifact    EC2 + Tomcat
-                                                  (dependencies)
-                                                         │
-                                                    S3 Bucket
-                                                   (artifacts)
-```
+**1. Launched an EC2 instance with a key pair**
+Created an Amazon Linux EC2 instance (t3.micro), configured security groups for SSH and HTTP access, and generated a `.pem` key pair for secure authentication.
 
-**Deployment server** is provisioned using CloudFormation with:
-- A custom VPC and public subnet
-- Security group allowing HTTP (port 80) and application traffic (port 8080)
-- IAM instance profile granting EC2 access to S3 and CodeDeploy
-- CodeDeploy agent and Apache Tomcat pre-installed via UserData script
+**2. Connected VS Code to EC2 via Remote SSH**
+Installed the Remote-SSH extension in VS Code, configured the SSH `config` file with the EC2 hostname and key pair path, and connected directly to the server from the IDE.
 
----
+**3. Installed Java and Maven**
+Installed Amazon Corretto 8 (Java) and Apache Maven on the EC2 instance. Maven is the build tool that downloads dependencies and compiles the Java app.
 
-## Project Structure
+**4. Created the Java web application**
+Used the Maven archetype command to generate a Java web app project structure, then edited `index.jsp` to create the web page content.
 
-```
-nextwork-cicd-webproject/
-├── src/
-│   └── main/
-│       └── webapp/
-│           ├── WEB-INF/
-│           │   └── web.xml
-│           └── index.jsp          # Main web page
-├── scripts/
-│   ├── install_dependencies.sh    # Installs Tomcat and dependencies
-│   ├── start_server.sh            # Starts Tomcat after deployment
-│   └── stop_server.sh             # Safely stops Tomcat before deployment
-├── appspec.yml                    # CodeDeploy instruction manual
-├── buildspec.yml                  # CodeBuild instruction manual
-├── pom.xml                        # Maven project configuration
-└── settings.xml                   # Maven → CodeArtifact connection settings
-```
+**5. Installed Git and connected to GitHub**
+Installed Git on EC2, configured identity, initialised a local repository, and pushed the project to a GitHub repository using a Personal Access Token.
 
----
+**6. Set up AWS CodeArtifact**
+Created a CodeArtifact domain and repository with Maven Central as the upstream source. Configured `settings.xml` to route all Maven dependency requests through the private repository using a temporary auth token.
 
-## Key Configuration Files
+**7. Wrote buildspec.yml for CodeBuild**
+Created a `buildspec.yml` instruction file telling CodeBuild to authenticate with CodeArtifact, compile the Java code, and package it into a `.war` file. Configured the artifacts section to include `appspec.yml` and `scripts/` for CodeDeploy.
 
-### buildspec.yml
-Tells CodeBuild how to build the application. Key phases:
-- **pre_build** — authenticates with CodeArtifact to fetch private packages
-- **build** — compiles Java source code with Maven
-- **post_build** — packages the app into a `.war` file
-- **artifacts** — specifies which files to pass to CodeDeploy (`.war`, `appspec.yml`, `scripts/`)
+**8. Set up the deployment server with CloudFormation**
+Used a CloudFormation template to provision the deployment EC2 instance, VPC, subnet, security groups, and IAM roles. The template includes a UserData script to auto-install the CodeDeploy agent and Tomcat on launch.
 
-### appspec.yml
-Tells CodeDeploy how to deploy the application. Key sections:
-- **files** — copies the `.war` file to Tomcat's `webapps/` directory
-- **BeforeInstall hook** — runs `install_dependencies.sh` to set up Tomcat
-- **ApplicationStart hook** — runs `start_server.sh` to start the server
-- **ApplicationStop hook** — runs `stop_server.sh` to safely stop before update
+**9. Wrote appspec.yml and deployment scripts**
+Created `appspec.yml` as the instruction manual for CodeDeploy, along with three shell scripts — `install_dependencies.sh`, `start_server.sh`, and `stop_server.sh` — to manage the Tomcat server during each deployment lifecycle stage.
 
-### settings.xml
-Configures Maven to authenticate with AWS CodeArtifact using a temporary token, routing all dependency requests to the private repository instead of the public internet.
+**10. Created CodeDeploy application and deployment group**
+Set up a CodeDeploy application targeting the EC2 instance using the `role: webserver` tag. Configured the deployment group with `CodeDeployDefault.AllAtOnce` strategy.
+
+**11. Built the CodePipeline**
+Connected all stages: GitHub (via GitHub App) as the source, CodeBuild for the build stage, and CodeDeploy for the deploy stage. The pipeline triggers automatically on every push to the `master` branch via webhook.
+
+**12. Tested end-to-end automation**
+Updated `index.jsp`, pushed to GitHub, and watched the pipeline automatically trigger, build, and deploy — with the updated text appearing live on the server within minutes.
 
 ---
 
 ## Troubleshooting & Lessons Learned
 
-Building this pipeline involved real-world debugging. Here are the key issues encountered and how they were resolved:
-
-**CodeDeploy agent not found on EC2**
-The CloudFormation template did not include a UserData script to auto-install the CodeDeploy agent. The fix was adding a UserData block to the template so every new EC2 instance comes pre-configured — no manual setup needed.
-
-**`aartifacts` typo in buildspec.yml**
-A double-`a` typo (`aartifacts` instead of `artifacts`) meant CodeBuild never saved any output files to S3. CodeDeploy had nothing to deploy. The fix was a one-character correction — a good reminder to always validate configuration file keys carefully.
+Real issues encountered and resolved during the project:
 
 **Wrong AWS region in settings.xml**
-The CodeArtifact URL pointed to `eu-north-1` (Stockholm) while all other resources were in `us-east-1`. This caused `Unauthorized` errors during the Maven build. Fix: updated the URL to the correct region.
+The CodeArtifact URL pointed to `eu-north-1` (Stockholm) while all resources were in `us-east-1`. This caused `Unauthorized` errors during the Maven build. Fixed by updating the URL to the correct region — a reminder to always check the region selector in the AWS Console before creating resources.
 
 **CodeBuild missing CodeArtifact permissions**
-Each time the CodeBuild project was recreated, its new service role started with no CodeArtifact permissions. Fix: manually attached `AWSCodeArtifactReadOnlyAccess` to the CodeBuild service role.
+Each time the CodeBuild project was recreated, its new service role had no CodeArtifact permissions, causing the pre_build phase to fail with exit status 254. Fixed by attaching `AWSCodeArtifactReadOnlyAccess` to the CodeBuild service role.
 
 **Windows SSH key permission errors**
-Windows OpenSSH enforces strict ACL permissions that conflict with WSL file paths. Fix: kept the `.pem` key in the WSL `~/.ssh/` directory for terminal use, and copied it to `C:\Users\rukky\.ssh\` for VS Code Remote-SSH. Linux `chmod 400` handled permissions correctly without the Windows ACL fight.
-
-**EC2 IP changing after restart**
-AWS assigns a new public IP every time an EC2 instance restarts. Fix: use an Elastic IP for a permanent address, or update the security group's SSH rule to "My IP" and update the SSH config after each restart.
+Windows OpenSSH enforces strict ACL permissions that conflicted with WSL file paths, causing `Permission denied (publickey)` errors. Fixed by storing the `.pem` key in WSL `~/.ssh/` for terminal use and copying it to `C:\Users\rukky\.ssh\` for VS Code Remote-SSH. Linux `chmod 400` handled permissions correctly.
 
 **CodePipeline "No Branch master found"**
-The repository name field required `username/repo-name` format, not the full GitHub URL. Fix: changed `https://github.com/rukkylatunde2001/nextwork-cicd-webproject.git` to `rukkylatunde2001/nextwork-cicd-webproject`.
+The repository field required `username/repo-name` format, not the full GitHub URL. Fixed by changing the input from the full HTTPS URL to `rukkylatunde2001/nextwork-cicd-webproject`.
+
+**EC2 IP changing after restart**
+AWS assigns a new public IP every time an instance restarts, breaking SSH config and security group rules. Workaround: update the security group SSH rule to "My IP" after each restart and update the SSH config with the new IP. Long-term fix: use an Elastic IP for a permanent address.
 
 ---
 
@@ -188,11 +126,11 @@ The repository name field required `username/repo-name` format, not the full Git
 **Rukayat Alarape**
 AWS DevOps learner | NextWork Student
 
-Built as part of the [NextWork 6-Part DevOps Series](https://nextwork.org) — a hands-on curriculum for building real cloud infrastructure from scratch.
+Built as part of the [NextWork 6-Part DevOps Series](https://nextwork.org).
 
 - GitHub: [@rukkylatunde2001](https://github.com/rukkylatunde2001)
 - Email: rukkylatunde2001@gmail.com
 
 ---
 
-*Part of the NextWork DevOps Series: Set Up a Web App → Connect GitHub → Secure Packages with CodeArtifact → Continuous Integration with CodeBuild → Deploy with CodeDeploy → **CI/CD with CodePipeline** ✅*
+*Part of the NextWork DevOps Series: Set Up a Web App → Connect GitHub → Store Dependencies → Package App → Deploy App → **CI/CD with CodePipeline** ✅*
